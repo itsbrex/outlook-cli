@@ -39,7 +39,7 @@ pytest -m smoke      # run only smoke tests (require live token)
   - `folders.py` — `folders`, `folder`
   - `categories.py` — `categories`, `categorize`, `uncategorize`, `category-create/rename/clear/delete`
   - `signatures.py` — `signature-pull`, `signature-list`, `signature-show`, `signature-delete`
-  - `manage.py` — `mark-read`, `move`, `delete`, `flag`
+  - `manage.py` — `mark-read`, `move`, `delete`, `flag`, `pin`
   - `attachments.py` — `attachments`
   - `calendar.py` — `calendar`, `event`, `event-create/update/delete/instances/respond`, `calendars`, `free-busy`, `people-search`
   - `contacts.py` — `contacts`

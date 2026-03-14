@@ -122,3 +122,23 @@ def flag(message_ids: tuple, due: str | None, complete: bool, clear: bool):
             print_success(f"Message #{mid} flag marked complete")
         else:
             print_success(f"Message #{mid} flag cleared")
+
+
+@click.command()
+@click.argument("message_ids", nargs=-1, required=True)
+@click.option("--unpin", is_flag=True, help="Unpin messages instead")
+@_handle_api_error
+def pin(message_ids: tuple, unpin: bool):
+    """Pin or unpin messages. Pinned messages stay at the top of your inbox.
+
+    \b
+    Examples:
+      outlook pin 3              # pin message
+      outlook pin 3 4 5          # pin multiple messages
+      outlook pin 3 --unpin      # unpin message
+    """
+    client = _get_client()
+    for mid in message_ids:
+        client.pin_message(mid, pinned=not unpin)
+        action = "unpinned" if unpin else "pinned"
+        print_success(f"Message #{mid} {action}")

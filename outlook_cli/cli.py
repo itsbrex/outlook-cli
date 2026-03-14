@@ -20,7 +20,7 @@ from .commands import (
 
 
 @click.group()
-@click.version_option(package_name="outlook-cli")
+@click.version_option(package_name="outlook365-cli")
 def cli():
     """Outlook 365 CLI - read, send, and manage emails from the terminal."""
     pass

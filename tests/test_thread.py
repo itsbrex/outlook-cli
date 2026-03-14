@@ -69,7 +69,7 @@ class TestPrintThread:
 
 class TestGetThread:
     def test_returns_conversation_messages(self):
-        """get_thread should filter by ConversationId and sort ascending."""
+        """get_thread should search by subject and filter by ConversationId client-side."""
         from outlook_cli.client import OutlookClient
 
         with patch.object(OutlookClient, '__init__', lambda self, token: None):
@@ -77,11 +77,10 @@ class TestGetThread:
             client._id_map = {"1": "real_id_1"}
             client._next_num = 10
 
-            # Mock get_message to return an email with conversation_id
-            mock_email = _make_email("Test", "Alice", 1)
+            mock_email = _make_email("Re: Test", "Alice", 1)
             client.get_message = MagicMock(return_value=mock_email)
 
-            # Mock _get to return conversation results
+            # API returns messages from search — includes same + different conversations
             api_response = {
                 "value": [
                     {
@@ -96,6 +95,12 @@ class TestGetThread:
                         "ConversationId": "conv_abc123",
                         "ReceivedDateTime": "2026-03-10T10:00:00Z",
                     },
+                    {
+                        "Id": "msg_other",
+                        "Subject": "Test something else",
+                        "ConversationId": "conv_DIFFERENT",
+                        "ReceivedDateTime": "2026-03-10T11:00:00Z",
+                    },
                 ]
             }
             client._get = MagicMock(return_value=api_response)
@@ -103,14 +108,14 @@ class TestGetThread:
 
             messages = client.get_thread("1")
 
+            # Should only include messages with matching ConversationId
             assert len(messages) == 2
             assert messages[0].subject == "Test"
             assert messages[1].subject == "Re: Test"
 
-            # Verify the API was called with correct filter
+            # Verify $search was used (not $filter)
             call_args = client._get.call_args
-            assert "ConversationId eq" in call_args[1]["params"]["$filter"]
-            assert call_args[1]["params"]["$orderby"] == "ReceivedDateTime asc"
+            assert "$search" in call_args[1]["params"]
 
     def test_no_conversation_id_returns_single(self):
         """If message has no conversation_id, return just that message."""

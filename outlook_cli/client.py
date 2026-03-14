@@ -362,6 +362,24 @@ class OutlookClient:
         real_id = self._resolve_id(message_id)
         self._patch(f"/messages/{real_id}", json={"IsRead": is_read})
 
+    def set_flag(
+        self,
+        message_id: str,
+        status: str = "flagged",
+        due_date: str | None = None,
+    ) -> dict:
+        """Set the follow-up flag on a message.
+
+        status: "flagged", "complete", or "notFlagged".
+        due_date: optional ISO date string (YYYY-MM-DD) for DueDateTime/StartDateTime.
+        """
+        real_id = self._resolve_id(message_id)
+        flag: dict = {"FlagStatus": status}
+        if due_date and status == "flagged":
+            flag["DueDateTime"] = {"DateTime": f"{due_date}T23:59:59", "TimeZone": "UTC"}
+            flag["StartDateTime"] = {"DateTime": f"{due_date}T00:00:00", "TimeZone": "UTC"}
+        return self._patch(f"/messages/{real_id}", json={"Flag": flag})
+
     # ------------------------------------------------------------------
     # Scheduled send
     # ------------------------------------------------------------------

@@ -73,6 +73,7 @@ cli.add_command(signatures_mod.signature_delete)
 cli.add_command(manage_mod.mark_read)
 cli.add_command(manage_mod.move)
 cli.add_command(manage_mod.delete)
+cli.add_command(manage_mod.flag)
 
 # Attachments
 cli.add_command(attachments_mod.attachments)

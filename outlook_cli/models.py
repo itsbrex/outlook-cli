@@ -36,6 +36,8 @@ class Email:
     importance: str
     conversation_id: str
     categories: list[str] = field(default_factory=list)
+    flag_status: str = "notFlagged"  # "notFlagged", "flagged", "complete"
+    flag_due: datetime | None = None
     scheduled_send: datetime | None = None
     # display number assigned by CLI
     display_num: int = 0
@@ -47,6 +49,12 @@ class Email:
             if "0x3FEF" in prop.get("PropertyId", ""):
                 scheduled_send = _parse_dt(prop.get("Value", ""))
                 break
+
+        flag_data = data.get("Flag", {})
+        flag_status = flag_data.get("FlagStatus", "notFlagged") if flag_data else "notFlagged"
+        flag_due = None
+        if flag_data and flag_data.get("DueDateTime"):
+            flag_due = _parse_dt(flag_data["DueDateTime"].get("DateTime", ""))
 
         return cls(
             id=data["Id"],
@@ -63,6 +71,8 @@ class Email:
             importance=data.get("Importance", "Normal"),
             conversation_id=data.get("ConversationId", ""),
             categories=data.get("Categories", []),
+            flag_status=flag_status,
+            flag_due=flag_due,
             scheduled_send=scheduled_send,
         )
 

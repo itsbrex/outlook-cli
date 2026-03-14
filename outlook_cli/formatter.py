@@ -22,7 +22,7 @@ def print_inbox(messages: list[Email]) -> None:
     if show_categories:
         table.add_column("Category", width=16, no_wrap=True, overflow="ellipsis")
     table.add_column("Date", width=9, no_wrap=True, justify="right")
-    table.add_column("", width=2)  # flags
+    table.add_column("", width=3)  # flags
 
     for msg in messages:
         flags = ""
@@ -30,6 +30,10 @@ def print_inbox(messages: list[Email]) -> None:
             flags += "*"
         if msg.has_attachments:
             flags += "@"
+        if msg.flag_status == "flagged":
+            flags += "!"
+        elif msg.flag_status == "complete":
+            flags += "v"
 
         style = "bold" if not msg.is_read else ""
         row = [
@@ -55,6 +59,13 @@ def print_email(email: Email) -> None:
     header += f"[bold]Date:[/bold] {email.received.strftime('%Y-%m-%d %H:%M')}\n"
     if email.categories:
         header += f"[bold]Categories:[/bold] {', '.join(email.categories)}\n"
+    if email.flag_status == "flagged":
+        flag_info = "Flagged"
+        if email.flag_due and email.flag_due != datetime.min:
+            flag_info += f" (due: {email.flag_due.strftime('%Y-%m-%d')})"
+        header += f"[bold]Flag:[/bold] {flag_info}\n"
+    elif email.flag_status == "complete":
+        header += f"[bold]Flag:[/bold] Complete\n"
     header += f"[bold]Subject:[/bold] {email.subject}"
 
     body = _html_to_text(email.body) if email.body_type == "HTML" else email.body

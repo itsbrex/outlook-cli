@@ -13,7 +13,7 @@ Uses OWA bearer token authentication via Playwright — no admin consent or API 
 ## Install
 
 ```sh
-pip install -e .
+pip install outlook365-cli
 playwright install chromium
 ```
 
@@ -289,4 +289,14 @@ browser:
   headless: false
   timeout: 120
 output_format: table
+```
+
+## Development
+
+```sh
+git clone https://github.com/yusufaltunbicak/outlook-cli.git
+cd outlook-cli
+pip install -e ".[dev]"
+playwright install chromium
+pytest
 ```

@@ -111,11 +111,16 @@ def _build_recurrence(
 @click.option("--days", default=7, type=int, help="Number of days to show")
 @click.option("--calendar", "cal_name", default=None, help="Calendar name (default: your primary calendar)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
 @click.option("--output", "-o", type=click.Path(), help="Save output to file")
 @account_option
 @_handle_api_error
-def calendar(days: int, cal_name: str | None, as_json: bool, output: str | None, account_name: str | None):
-    """Show upcoming calendar events."""
+def calendar(days: int, cal_name: str | None, as_json: bool, as_local: bool, output: str | None, account_name: str | None):
+    """Show upcoming calendar events.
+
+    The --local flag converts UTC times to your system's local timezone.
+    In JSON mode, this adds "local" and "local_iso" fields to datetime values.
+    """
     client = _get_client()
     now = datetime.now(timezone.utc)
     end = now + timedelta(days=days)
@@ -127,10 +132,10 @@ def calendar(days: int, cal_name: str | None, as_json: bool, output: str | None,
 
     if _wants_json(as_json):
         if output:
-            save_json(events, output)
+            save_json(events, output, local=as_local)
             print_success(f"Saved to {output}")
         else:
-            click.echo(to_json_envelope(events))
+            click.echo(to_json_envelope(events, local=as_local))
     else:
         if not events:
             print_success(f"No events in the next {days} days.")
@@ -142,14 +147,15 @@ def calendar(days: int, cal_name: str | None, as_json: bool, output: str | None,
 @click.command()
 @click.argument("event_id")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
 @account_option
 @_handle_api_error
-def event(event_id: str, as_json: bool, account_name: str | None):
+def event(event_id: str, as_json: bool, as_local: bool, account_name: str | None):
     """View event details by display number."""
     client = _get_client()
     ev = client.get_event(event_id)
     if _wants_json(as_json):
-        click.echo(to_json_envelope(ev))
+        click.echo(to_json_envelope(ev, local=as_local))
     else:
         print_event_detail(ev)
 
@@ -333,9 +339,10 @@ def event_delete(event_ids: tuple, series: bool, yes: bool, account_name: str | 
 @click.argument("event_id")
 @click.option("--days", default=90, type=int, help="Look-ahead days (default 90)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
 @account_option
 @_handle_api_error
-def event_instances(event_id: str, days: int, as_json: bool, account_name: str | None):
+def event_instances(event_id: str, days: int, as_json: bool, as_local: bool, account_name: str | None):
     """List occurrences of a recurring event."""
     client = _get_client()
     now = datetime.now(timezone.utc)
@@ -346,7 +353,7 @@ def event_instances(event_id: str, days: int, as_json: bool, account_name: str |
         end=end.isoformat(),
     )
     if _wants_json(as_json):
-        click.echo(to_json_envelope(events))
+        click.echo(to_json_envelope(events, local=as_local))
     else:
         if not events:
             print_success("No occurrences found.")
@@ -401,9 +408,10 @@ def calendars_cmd(as_json: bool, account_name: str | None):
 @click.option("--end-hour", default=18, type=int, help="End hour (default 18)")
 @click.option("--duration", "-d", default=60, type=int, help="Meeting duration in minutes (default 60)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
 @account_option
 @_handle_api_error
-def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duration: int, as_json: bool, account_name: str | None):
+def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duration: int, as_json: bool, as_local: bool, account_name: str | None):
     """Find available meeting times.
 
     ATTENDEES: comma-separated emails. DATE: YYYY-MM-DD, today, or tomorrow.
@@ -428,7 +436,7 @@ def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duratio
     )
 
     if _wants_json(as_json):
-        click.echo(to_json_envelope(suggestions))
+        click.echo(to_json_envelope(suggestions, local=as_local))
     else:
         if not suggestions:
             print_error("No available meeting slots found.")

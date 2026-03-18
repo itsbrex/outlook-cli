@@ -25,6 +25,51 @@ from ._common import (
 )
 
 
+def _parse_timezone(tz_str: str | None):
+    """Parse timezone string to timezone object.
+
+    Supports:
+      None          -> system local timezone
+      UTC           -> UTC
+      UTC+8, UTC-5  -> fixed offset
+      Asia/Shanghai -> IANA timezone name
+    """
+    if tz_str is None:
+        # Return None to use system default
+        return None
+
+    tz_str = tz_str.strip()
+
+    # UTC
+    if tz_str.upper() == "UTC":
+        return timezone.utc
+
+    # UTC+8, UTC-5, etc.
+    import re
+    offset_match = re.match(r'^UTC([+-])(\d{1,2})(?::(\d{2}))?$', tz_str, re.IGNORECASE)
+    if offset_match:
+        sign = 1 if offset_match.group(1) == '+' else -1
+        hours = int(offset_match.group(2))
+        minutes = int(offset_match.group(3) or 0)
+        return timezone(sign * timedelta(hours=hours, minutes=minutes))
+
+    # IANA timezone name (e.g., Asia/Shanghai)
+    try:
+        import zoneinfo
+        return zoneinfo.ZoneInfo(tz_str)
+    except (ImportError, AttributeError):
+        # Python < 3.9, fallback to dateutil
+        try:
+            from dateutil import tz
+            return tz.gettz(tz_str)
+        except ImportError:
+            raise click.BadParameter(
+                f"Unknown timezone: {tz_str}. Install python-dateutil for IANA timezone support."
+            )
+    except Exception:
+        raise click.BadParameter(f"Unknown timezone: {tz_str}")
+
+
 def _parse_event_time(s: str) -> str:
     """Parse event time to ISO format for the API.
 
@@ -111,16 +156,18 @@ def _build_recurrence(
 @click.option("--days", default=7, type=int, help="Number of days to show")
 @click.option("--calendar", "cal_name", default=None, help="Calendar name (default: your primary calendar)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
+@click.option("--timezone", "tz_str", default=None, help="Timezone for output (default: system local). Examples: UTC, UTC+8, Asia/Shanghai")
 @click.option("--output", "-o", type=click.Path(), help="Save output to file")
 @account_option
 @_handle_api_error
-def calendar(days: int, cal_name: str | None, as_json: bool, as_local: bool, output: str | None, account_name: str | None):
+def calendar(days: int, cal_name: str | None, as_json: bool, tz_str: str | None, output: str | None, account_name: str | None):
     """Show upcoming calendar events.
 
-    The --local flag converts UTC times to your system's local timezone.
-    In JSON mode, this adds "local" and "local_iso" fields to datetime values.
+    Datetimes are automatically converted to your system's local timezone.
+    Use --timezone to override with a specific timezone.
     """
+    tz = _parse_timezone(tz_str)
+
     client = _get_client()
     now = datetime.now(timezone.utc)
     end = now + timedelta(days=days)
@@ -132,10 +179,10 @@ def calendar(days: int, cal_name: str | None, as_json: bool, as_local: bool, out
 
     if _wants_json(as_json):
         if output:
-            save_json(events, output, local=as_local)
+            save_json(events, output, timezone=tz)
             print_success(f"Saved to {output}")
         else:
-            click.echo(to_json_envelope(events, local=as_local))
+            click.echo(to_json_envelope(events, timezone=tz))
     else:
         if not events:
             print_success(f"No events in the next {days} days.")
@@ -147,15 +194,16 @@ def calendar(days: int, cal_name: str | None, as_json: bool, as_local: bool, out
 @click.command()
 @click.argument("event_id")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
+@click.option("--timezone", "tz_str", default=None, help="Timezone for output (default: system local). Examples: UTC, UTC+8, Asia/Shanghai")
 @account_option
 @_handle_api_error
-def event(event_id: str, as_json: bool, as_local: bool, account_name: str | None):
+def event(event_id: str, as_json: bool, tz_str: str | None, account_name: str | None):
     """View event details by display number."""
+    tz = _parse_timezone(tz_str)
     client = _get_client()
     ev = client.get_event(event_id)
     if _wants_json(as_json):
-        click.echo(to_json_envelope(ev, local=as_local))
+        click.echo(to_json_envelope(ev, timezone=tz))
     else:
         print_event_detail(ev)
 
@@ -339,11 +387,12 @@ def event_delete(event_ids: tuple, series: bool, yes: bool, account_name: str | 
 @click.argument("event_id")
 @click.option("--days", default=90, type=int, help="Look-ahead days (default 90)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
+@click.option("--timezone", "tz_str", default=None, help="Timezone for output (default: system local). Examples: UTC, UTC+8, Asia/Shanghai")
 @account_option
 @_handle_api_error
-def event_instances(event_id: str, days: int, as_json: bool, as_local: bool, account_name: str | None):
+def event_instances(event_id: str, days: int, as_json: bool, tz_str: str | None, account_name: str | None):
     """List occurrences of a recurring event."""
+    tz = _parse_timezone(tz_str)
     client = _get_client()
     now = datetime.now(timezone.utc)
     end = now + timedelta(days=days)
@@ -353,7 +402,7 @@ def event_instances(event_id: str, days: int, as_json: bool, as_local: bool, acc
         end=end.isoformat(),
     )
     if _wants_json(as_json):
-        click.echo(to_json_envelope(events, local=as_local))
+        click.echo(to_json_envelope(events, timezone=tz))
     else:
         if not events:
             print_success("No occurrences found.")
@@ -408,14 +457,15 @@ def calendars_cmd(as_json: bool, account_name: str | None):
 @click.option("--end-hour", default=18, type=int, help="End hour (default 18)")
 @click.option("--duration", "-d", default=60, type=int, help="Meeting duration in minutes (default 60)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-@click.option("--local", "as_local", is_flag=True, help="Convert times to local timezone (for JSON output)")
+@click.option("--timezone", "tz_str", default=None, help="Timezone for output (default: system local). Examples: UTC, UTC+8, Asia/Shanghai")
 @account_option
 @_handle_api_error
-def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duration: int, as_json: bool, as_local: bool, account_name: str | None):
+def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duration: int, as_json: bool, tz_str: str | None, account_name: str | None):
     """Find available meeting times.
 
     ATTENDEES: comma-separated emails. DATE: YYYY-MM-DD, today, or tomorrow.
     """
+    tz = _parse_timezone(tz_str)
     addr_list = [a.strip() for a in attendees.split(",")]
 
     if date.lower() == "today":
@@ -436,7 +486,7 @@ def free_busy(attendees: str, date: str, start_hour: int, end_hour: int, duratio
     )
 
     if _wants_json(as_json):
-        click.echo(to_json_envelope(suggestions, local=as_local))
+        click.echo(to_json_envelope(suggestions, timezone=tz))
     else:
         if not suggestions:
             print_error("No available meeting slots found.")

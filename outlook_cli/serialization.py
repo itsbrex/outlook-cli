@@ -49,24 +49,22 @@ def to_json(items: list | dict, pretty: bool = True) -> str:
     return json.dumps(_normalize(items), cls=_Encoder, indent=2 if pretty else None, ensure_ascii=False)
 
 
-def to_json_envelope(items: list | dict, pretty: bool = True, local: bool = False) -> str:
+def to_json_envelope(items: list | dict, pretty: bool = True, timezone=None) -> str:
     """Wrap data in {ok, schema_version, data} envelope for stdout.
 
     Args:
         items: Data to serialize
         pretty: Pretty-print JSON (default True)
-        local: Convert datetimes to local timezone (default False)
+        timezone: Target timezone (default: system local timezone)
     """
-    if local:
-        local_tz = _get_local_timezone()
+    if timezone is None:
+        timezone = _get_local_timezone()
 
-        class _LocalEncoder(_Encoder):
-            def __init__(self, **kwargs):
-                super().__init__(local_tz=local_tz, **kwargs)
+    class _LocalEncoder(_Encoder):
+        def __init__(self, **kwargs):
+            super().__init__(local_tz=timezone, **kwargs)
 
-        encoder_cls = _LocalEncoder
-    else:
-        encoder_cls = _Encoder
+    encoder_cls = _LocalEncoder
 
     envelope = {
         "ok": True,
@@ -86,24 +84,22 @@ def error_json(code: str, message: str) -> str:
     return json.dumps(envelope, indent=2, ensure_ascii=False)
 
 
-def save_json(items: list | dict, path: str, local: bool = False) -> None:
+def save_json(items: list | dict, path: str, timezone=None) -> None:
     """Save raw JSON to file (no envelope — file export is raw data).
 
     Args:
         items: Data to serialize
         path: File path to write to
-        local: Convert datetimes to local timezone (default False)
+        timezone: Target timezone (default: system local timezone)
     """
-    if local:
-        local_tz = _get_local_timezone()
+    if timezone is None:
+        timezone = _get_local_timezone()
 
-        class _LocalEncoder(_Encoder):
-            def __init__(self, **kwargs):
-                super().__init__(local_tz=local_tz, **kwargs)
+    class _LocalEncoder(_Encoder):
+        def __init__(self, **kwargs):
+            super().__init__(local_tz=timezone, **kwargs)
 
-        encoder_cls = _LocalEncoder
-    else:
-        encoder_cls = _Encoder
+    encoder_cls = _LocalEncoder
 
     with open(path, "w") as f:
         f.write(json.dumps(_normalize(items), cls=encoder_cls, indent=2, ensure_ascii=False))

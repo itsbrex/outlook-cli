@@ -38,8 +38,35 @@ def login(
     debug: bool = False,
     account_name: str | None = None,
     allow_create: bool = False,
+    token: str | None = None,
 ) -> str:
-    """Launch Playwright browser to capture a bearer token for an account profile."""
+    """Authenticate and cache a bearer token.
+
+    Args:
+        force: Force re-login, ignore saved session
+        debug: Show debug info about captured requests
+        account_name: Account profile name
+        allow_create: Allow creating new account profile
+        token: Pre-fetched bearer token (skips browser if provided)
+
+    Returns:
+        Valid bearer token
+    """
+    # If token is provided directly, skip browser and validate it
+    if token is not None:
+        # Validate token format (JWT should have 3 parts)
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Invalid token format. Expected JWT with 3 parts.")
+        # Verify token works
+        me = _get_me_for_token(token)
+        selected = account_service.resolve_account_name(account_name, allow_missing=allow_create)
+        account_service.assert_mailbox_matches(selected, me)
+        mailbox_info = account_service.mailbox_info_from_me(me)
+        _save_token(token, selected, mailbox_info)
+        return token
+
+    # Otherwise, launch browser to capture token
     from playwright.sync_api import sync_playwright
 
     selected = account_service.resolve_account_name(account_name, allow_missing=allow_create)
